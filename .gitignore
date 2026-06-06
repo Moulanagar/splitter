@@ -6,3 +6,6 @@ build/
 *.log
 .vscode/
 .idea/
+DEPLOY.md
+SETUP.md
+README.md
