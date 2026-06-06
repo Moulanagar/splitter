@@ -130,11 +130,6 @@ Tables:
 - `group_messages`
 - `settlement_proofs`
 
-Important:
-
-- Run the full `schema.sql` in Supabase SQL Editor.
-- If chat fails with `Could not find table public.group_messages`, the SQL has not been applied.
-- If proof workflow fails with missing `settlement_proofs`, run the latest schema.
 
 ---
 
@@ -202,9 +197,6 @@ Optional multi-origin CORS:
 ```text
 FRONTEND_URLS=https://app.vercel.app,https://custom-domain.com
 ```
-
-Do not include trailing slash or `/api` in `FRONTEND_URL`.
-
 ---
 
 ## Frontend
@@ -224,45 +216,6 @@ frontend/
   src/styles/Expenses.css
   src/styles/GroupChat.css
 ```
-
-### Frontend Environment Variable
-
-Use `frontend/.env.example`.
-
-Required:
-
-```text
-REACT_APP_API_URL=https://splitter-1-mr2p.onrender.com/api
-```
-
-For local dev:
-
-```text
-REACT_APP_API_URL=http://localhost:5000/api
-```
-
-React env variables are baked at build time, so after changing Vercel env vars, redeploy the frontend.
-
----
-
-Recommended flow:
-
-1. Push repo to GitHub.
-2. Run `schema.sql` in Supabase.
-3. Deploy backend on Render from `backend`.
-4. Set backend env vars on Render.
-5. Deploy frontend on Vercel from `frontend`.
-6. Set `REACT_APP_API_URL` in Vercel.
-7. Set `FRONTEND_URL` or `FRONTEND_URLS` in Render.
-8. Redeploy both services.
-
-Common CORS fix:
-
-- Render `FRONTEND_URL` must exactly match the browser origin.
-- Example: `https://splitter.vercel.app`
-- Not: `https://splitter.vercel.app/`
-- Not: `https://splitter.vercel.app/api`
-
 ---
 
 ## Known Limitations / Future Improvements
