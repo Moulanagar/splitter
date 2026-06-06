@@ -1,0 +1,22 @@
+{
+  "name": "splitwise-backend",
+  "version": "1.0.0",
+  "description": "Splitwise clone backend",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "@supabase/supabase-js": "^2.26.0",
+    "jsonwebtoken": "^9.0.0",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20"
+  }
+}
