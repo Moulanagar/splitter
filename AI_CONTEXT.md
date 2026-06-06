@@ -177,28 +177,6 @@ Settlements:
 - `POST /api/settlements/proofs`
 - `PATCH /api/settlements/proofs/:proofId`
 
-### Backend Environment Variables
-
-Use `backend/.env.example`.
-
-Required:
-
-```text
-SUPABASE_URL=
-SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-JWT_SECRET=
-FRONTEND_URL=
-NODE_ENV=production
-```
-
-Optional multi-origin CORS:
-
-```text
-FRONTEND_URLS=https://app.vercel.app,https://custom-domain.com
-```
----
-
 ## Frontend
 
 ### Directory
