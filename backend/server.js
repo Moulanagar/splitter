@@ -10,15 +10,25 @@ import settlementRoutes from './routes/settlements.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const frontendUrls = [
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URLS
+]
+  .filter(Boolean)
+  .flatMap(urls => urls.split(','))
+  .map(url => url.trim().replace(/\/$/, ''))
+  .filter(Boolean);
 const allowedOrigins = [
   'http://localhost:3000',
-  process.env.FRONTEND_URL
+  ...frontendUrls
 ].filter(Boolean);
 
 // Middleware
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    const normalizedOrigin = origin?.replace(/\/$/, '');
+
+    if (!normalizedOrigin || allowedOrigins.includes(normalizedOrigin)) {
       callback(null, true);
       return;
     }
