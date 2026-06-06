@@ -1,279 +1,308 @@
-# AI_CONTEXT.md - Splitwise 3-Day Build
+# AI_CONTEXT.md - Splitwise Clone
 
-**Last Updated**: June 5, 2026  
-**Project**: Splitwise Clone - 3-day internship assignment
-
----
-
-## PRODUCT GOALS
-
-- **Vision**: Build a minimal but functional expense-splitting app where friends can log expenses and see who owes whom.
-- **Scope**: 3-day build targeting core workflows only.
-- **Success Metric**: Users can register, login, join groups, add expenses, and see balances/settlements.
+**Last Updated**: June 6, 2026  
+**Project**: Splitwise-style expense splitting app  
+**Status**: Functional local app, prepared for Render + Vercel deployment
 
 ---
 
-## TECHNOLOGY STACK
+## Product Goal
 
-- **Frontend**: React (JavaScript)
-- **Backend**: Node.js + Express
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Email/password (register → login flow)
-- **Deployment**: Localhost (for now)
-- **Auth Flow**: 
-  - User registers with email/password
-  - User logs in, receives auth token
-  - Frontend authenticated endpoints fetch user's groups/expenses on dashboard
-  - Auth token included in all subsequent API calls
+Build a minimal but functional expense-splitting app where registered users can:
 
----
-
-## MVP FEATURES (In Scope)
-
-- [ ] User registration (email/password)
-- [ ] User login
-- [ ] Dashboard (loads after login)
-- [ ] View user's groups
-- [ ] View group expenses
-- [ ] View balances within groups
-- [ ] Add expense to group
-- [ ] Calculate who owes whom
+- Create groups with other registered users
+- Add expenses with multiple payers and borrower splits
+- See balances and settlement recommendations
+- Submit proof after paying a settlement
+- Approve or deny incoming payment proofs
+- Chat inside groups
+- Delete groups only after all payments are settled
 
 ---
 
-## OUT OF SCOPE (3-day constraint)
+## Tech Stack
 
-- Email/SMS notifications
-- Multiple currencies
-- Recurring expenses
-- Payments integration
-- Mobile app
-- Analytics/reports
-- User profile management (beyond email)
-- Recurring expenses
-- Email verification
+- **Frontend**: React 18, Axios
+- **Backend**: Node.js, Express
+- **Database**: Supabase PostgreSQL
+- **Auth**: Email/password with JWT stored in `localStorage`
+- **Deployment Target**:
+  - Backend: Render
+  - Frontend: Vercel or Netlify
+  - Database: Supabase
 
 ---
 
-## DATA MODEL - CORE ENTITIES
+## Current App Behavior
 
-### Users
-- `id` (UUID, primary key)
-- `email` (string, unique)
-- `password_hash` (string)
-- `name` (string, optional)
-- `created_at` (timestamp)
+### Authentication
+
+- Users can register with email, password, and optional name.
+- Users can login and receive a JWT.
+- JWT and user data are saved in `localStorage`.
+- On `Ctrl+R` / browser refresh, `App.jsx` restores the saved user and keeps the user logged in.
+- Logout clears `token`, `user`, and returns to login.
 
 ### Groups
-- `id` (UUID, primary key)
-- `name` (string)
-- `created_by` (UUID, FK to Users)
-- `created_at` (timestamp)
 
-### GroupMembers (join table)
-- `id` (UUID, primary key)
-- `group_id` (UUID, FK to Groups)
-- `user_id` (UUID, FK to Users)
-- `joined_at` (timestamp)
+- Users can create groups.
+- Minimum group size is **2 people total**: creator + 1 registered member email.
+- Member emails must already belong to registered users.
+- Group cards show member previews.
+- Group detail page shows members and supports adding more registered members.
+- Only the group creator can delete a group.
+- A group cannot be deleted if there is any pending/unsettled balance.
+- Approved settlement proofs count as paid when deciding whether deletion is allowed.
 
 ### Expenses
-- `id` (UUID, primary key)
-- `group_id` (UUID, FK to Groups)
-- `description` (string)
-- `total_amount` (decimal)
-- `created_at` (timestamp)
 
-### ExpensePayers (tracks who paid)
-- `id` (UUID, primary key)
-- `expense_id` (UUID, FK to Expenses)
-- `user_id` (UUID, FK to Users) - who paid
-- `amount_paid` (decimal)
+- Expense creation supports **multiple payers**.
+- Every member appears in the payer list with default amount `0`.
+- Borrowers are split equally by default across all group members.
+- Custom split mode allows manual borrower amounts.
+- Total paid must match total borrowed.
+- Backend validates paid/borrowed totals before saving.
+- Group expense view shows:
+  - Group members
+  - Current balances
+  - Settle-up recommendations
+  - Expense history
 
-### ExpenseSplits (tracks who owes)
-- `id` (UUID, primary key)
-- `expense_id` (UUID, FK to Expenses)
-- `user_id` (UUID, FK to Users) - who owes
-- `amount_owed` (decimal)
+### Balances And Settlements
 
----
+- Balance formula:
+  - `net = amount_paid - amount_owed + approved_settlement_payments`
+- Positive balance means the user should receive money.
+- Negative balance means the user should pay money.
+- Settlement recommendations minimize payments by matching debtors to creditors.
+- Dashboard shows settlements involving the current user:
+  - What the user has to pay
+  - What others have to pay the user
 
-## AUTHENTICATION FLOW
+### Settlement Proof Workflow
 
-1. User visits `/register`
-2. Enters email + password → backend creates user in `users` table
-3. Password hashed before storage
-4. User redirected to `/login`
-5. User enters email + password → backend verifies, returns JWT token
-6. Frontend stores token (localStorage)
-7. Frontend redirects to `/dashboard`
-8. Dashboard fetches user's groups with authenticated header
-9. All API calls include Authorization header with token
+- If a user owes someone, dashboard shows an `Add Proof` option.
+- Proof can be transaction ID, note, or link text.
+- Proof is sent to the receiver.
+- Receiver sees `Approve` and `Deny` buttons.
+- If approved:
+  - Payment counts as settled.
+  - Dashboard settlement amount updates.
+  - Group balances and settle-up view update.
+  - Delete-group guard treats the approved amount as paid.
+- If denied:
+  - Denied status is shown.
+  - Payer can submit updated proof.
+- Pending proofs show pending status until reviewed.
 
----
+### Group Chat
 
-## GROUP & EXPENSE LOGIC (DECIDED)
+- Each group has a group chat section.
+- Members can send messages.
+- Messages are saved in `group_messages`.
+- Chat polls every 5 seconds.
 
-### Group Membership
-- Users start with **NO groups** when they register
-- Users can **CREATE new groups** or be **ADDED to existing groups**
-- Minimum group size: **3 people**
+### Refresh / Sync Behavior
 
-### Expense Splits
-- **Default**: Split equally among group members
-- **Customizable**: Individual amounts can be altered per person
-- Example: $100 expense → default is $33.33 each → can change to $20, $30, $50 if needed
+This app currently uses polling, not true real-time sockets.
 
-### Multiple Payers (CASE 2 - App Handles Net Settlement)
-- **Single expense** = multiple payers + multiple owers
-- Example: Dinner $100 for 4 people (Alice, Bob, Charlie, David)
-  - At restaurant: Alice pays $40, Bob pays $60
-  - App splits $25 to each of 4 people
-  - Net calculation:
-    - Alice paid $40, owes $25 → Alice is owed $15
-    - Bob paid $60, owes $25 → Bob is owed $35
-    - Charlie owes $25 → Charlie owes $25
-    - David owes $25 → David owes $25
-  - Final settlements: Charlie pays Alice $15, David pays Alice $10 + Bob $15, etc.
+- Dashboard groups and settlements refresh every 7 seconds.
+- Group chat refreshes every 5 seconds.
+- Group approved settlement proofs refresh every 6 seconds.
+- Selected group is preserved in `localStorage` using `selectedGroupId`, so polling or browser refresh should not kick the user out of the group view.
 
-### Data Model Impact
-- **ExpensePayers** (new table): tracks who paid and how much
-  - `expense_id`, `user_id`, `amount_paid`
-- **ExpenseSplits**: tracks who owes and how much
-  - `expense_id`, `user_id`, `amount_owed`
-
-### Dashboard Layout
-- **Section 1**: User's Groups (list all groups user is member of, showing group name + balance)
-- **Section 2**: Pending Settlements (list of unsettled debts showing whether it's a group-level settlement or individual settlement)
+For true simultaneous updates, Supabase Realtime subscriptions would be the next improvement.
 
 ---
 
-## BUILD PLAN (Finalized)
+## Database Schema
 
-### Phase 1: Project Setup & Authentication ✅ IN PROGRESS
-1. Initialize project structure (backend + frontend) ✅
-2. Set up Supabase connection + schema (NEXT)
-3. Build backend: auth endpoints (register, login, token verification) ✅ 
-4. Build frontend: login/register pages, dashboard skeleton ✅
-5. Connect frontend to backend auth (NEXT)
+Defined in `schema.sql`.
 
-### Phase 2: Groups & Expenses
-6. Build groups endpoints + UI
-7. Build expenses endpoints + UI
-8. Implement balance calculation logic
+Tables:
 
-### Phase 3: Testing & Deployment
-9. Test full flow locally
-10. Prepare deployment
+- `users`
+- `groups`
+- `group_members`
+- `expenses`
+- `expense_payers`
+- `expense_splits`
+- `group_messages`
+- `settlement_proofs`
+
+Important:
+
+- Run the full `schema.sql` in Supabase SQL Editor.
+- If chat fails with `Could not find table public.group_messages`, the SQL has not been applied.
+- If proof workflow fails with missing `settlement_proofs`, run the latest schema.
 
 ---
 
-## BACKEND ARCHITECTURE
+## Backend
 
-**Tech**: Node.js + Express  
-**Auth**: JWT tokens (7-day expiry)  
-**Password**: bcrypt hashing
+### Directory
 
-### Directory Structure
-```
+```text
 backend/
-├── server.js (main entry point)
-├── package.json
-├── .env.example
-├── config/
-│   └── supabase.js (Supabase client)
-├── middleware/
-│   └── auth.js (JWT verification)
-└── routes/
-    ├── auth.js (register, login)
-    ├── groups.js (create, get groups)
-    └── expenses.js (add, get expenses)
+  server.js
+  config/supabase.js
+  middleware/auth.js
+  routes/auth.js
+  routes/groups.js
+  routes/expenses.js
+  routes/settlements.js
 ```
 
-### API Endpoints
-- `POST /api/auth/register` - Create user account
-- `POST /api/auth/login` - Login and get JWT token
-- `GET /api/groups` - Get user's groups (auth required)
-- `POST /api/groups` - Create new group (auth required)
-- `GET /api/expenses/group/:groupId` - Get expenses (auth required)
-- `POST /api/expenses` - Add expense (auth required)
+### Main Endpoints
+
+Auth:
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+
+Groups:
+
+- `GET /api/groups`
+- `POST /api/groups`
+- `GET /api/groups/:groupId`
+- `DELETE /api/groups/:groupId`
+- `POST /api/groups/:groupId/members`
+- `GET /api/groups/:groupId/messages`
+- `POST /api/groups/:groupId/messages`
+
+Expenses:
+
+- `GET /api/expenses/group/:groupId`
+- `POST /api/expenses`
+
+Settlements:
+
+- `GET /api/settlements`
+- `GET /api/settlements/group/:groupId/proofs`
+- `POST /api/settlements/proofs`
+- `PATCH /api/settlements/proofs/:proofId`
+
+### Backend Environment Variables
+
+Use `backend/.env.example`.
+
+Required:
+
+```text
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+JWT_SECRET=
+FRONTEND_URL=
+NODE_ENV=production
+```
+
+Optional multi-origin CORS:
+
+```text
+FRONTEND_URLS=https://app.vercel.app,https://custom-domain.com
+```
+
+Do not include trailing slash or `/api` in `FRONTEND_URL`.
 
 ---
 
-## FRONTEND ARCHITECTURE
+## Frontend
 
-**Tech**: React 18 + React Router + Axios
+### Directory
 
-### Directory Structure
-```
+```text
 frontend/
-├── src/
-│   ├── components/
-│   │   ├── Login.jsx
-│   │   ├── Register.jsx
-│   │   └── Dashboard.jsx
-│   ├── styles/
-│   │   ├── Auth.css
-│   │   └── Dashboard.css
-│   ├── App.jsx
-│   ├── index.js
-│   └── index.css
-├── public/
-│   └── index.html
-└── package.json
+  src/App.jsx
+  src/components/Login.jsx
+  src/components/Register.jsx
+  src/components/Dashboard.jsx
+  src/components/Expenses.jsx
+  src/components/GroupChat.jsx
+  src/styles/Auth.css
+  src/styles/Dashboard.css
+  src/styles/Expenses.css
+  src/styles/GroupChat.css
 ```
 
-### Auth Flow
-1. User visits app (defaults to login)
-2. User can register or login
-3. On success, token stored in localStorage
-4. Redirected to Dashboard
-5. Dashboard fetches groups with Authorization header
-6. User can logout (clears token & localStorage)
+### Frontend Environment Variable
+
+Use `frontend/.env.example`.
+
+Required:
+
+```text
+REACT_APP_API_URL=https://splitter-1-mr2p.onrender.com/api
+```
+
+For local dev:
+
+```text
+REACT_APP_API_URL=http://localhost:5000/api
+```
+
+React env variables are baked at build time, so after changing Vercel env vars, redeploy the frontend.
 
 ---
 
-## NEXT STEPS - SUPABASE SETUP
+Recommended flow:
 
-You must:
-1. Create Supabase project (free tier at supabase.com)
-2. Run SQL migrations to create tables
-3. Copy credentials to backend/.env
-4. Install dependencies and test
+1. Push repo to GitHub.
+2. Run `schema.sql` in Supabase.
+3. Deploy backend on Render from `backend`.
+4. Set backend env vars on Render.
+5. Deploy frontend on Vercel from `frontend`.
+6. Set `REACT_APP_API_URL` in Vercel.
+7. Set `FRONTEND_URL` or `FRONTEND_URLS` in Render.
+8. Redeploy both services.
+
+Common CORS fix:
+
+- Render `FRONTEND_URL` must exactly match the browser origin.
+- Example: `https://splitter.vercel.app`
+- Not: `https://splitter.vercel.app/`
+- Not: `https://splitter.vercel.app/api`
 
 ---
 
-## BUILD STATUS (JUNE 6, 2026 - FINAL UPDATE)
+## Known Limitations / Future Improvements
 
-### ✅ COMPLETED  
-- [x] Initialize project structure (backend + frontend)
-- [x] Set up Supabase connection + schema  
-- [x] Build backend: auth endpoints (register, login, JWT)
-- [x] Build frontend: login/register pages, dashboard
-- [x] Connect frontend to backend auth - **WORKING**
-- [x] Both servers running locally on ports 5000 (backend) & 3000 (frontend)
-- [x] End-to-end auth flow tested - **USER REGISTRATION & LOGIN WORKING**
-- [x] Group creation backend endpoints (POST, GET list, GET specific)
-- [x] Group management UI with group creation form
-- [x] Group detail view with navigation
-- [x] Expense form UI with **Case 2 logic** implemented:
-  - [x] "Who Paid?" section (multiple payers)
-  - [x] "How to Split?" section (equal or custom)
-  - [x] Backend expense endpoints ready for Case 2
-- [x] Expense display component structure
+- Updates are polling-based, not true real-time.
+- Supabase Realtime should be added for instant chat/settlement/expense updates.
+- Proof upload is currently text/link/transaction note, not file upload.
+- No email notifications.
+- No edit/delete expense flow yet.
+- No formal test suite yet.
+- CORS depends on correct Render `FRONTEND_URL` / `FRONTEND_URLS`.
 
-### 🔄 NEXT STEPS (Not completed in 3-day sprint)
-- [ ] Fix group members loading (minor 404 issue)
-- [ ] Test end-to-end expense creation with Case 2 logic
-- [ ] Build balance calculation logic
-- [ ] Build settlement recommendations
-- [ ] Add edit/delete expense functionality
-- [ ] Add tests & full error handling
+---
 
-### CURRENT STATUS  
-- **Backend**: ✅ Running on `localhost:5000`
-- **Frontend**: ✅ Running on `localhost:3000`  
-- **Database**: ✅ Connected & schema ready
-- **Auth**: ✅ Registration & login working
-- **Groups**: ✅ Creation & listing working
-- **Expenses**: ⚠️ UI ready, backend endpoints ready (needs member loading fix)
+## Verification Commands
 
+Frontend:
+
+```powershell
+cd frontend
+npm.cmd run build
+```
+
+Backend syntax checks:
+
+```powershell
+node --check backend\server.js
+node --check backend\routes\groups.js
+node --check backend\routes\expenses.js
+node --check backend\routes\settlements.js
+```
+
+Local run:
+
+```powershell
+cd backend
+npm.cmd start
+```
+
+```powershell
+cd frontend
+npm.cmd start
+```
